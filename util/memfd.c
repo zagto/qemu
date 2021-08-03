@@ -31,6 +31,7 @@
 #include "qemu/memfd.h"
 #include "qemu/host-utils.h"
 
+
 #if defined CONFIG_LINUX && !defined CONFIG_MEMFD
 #include <sys/syscall.h>
 #include <asm/unistd.h>
@@ -46,9 +47,40 @@ int memfd_create(const char *name, unsigned int flags)
 }
 #endif
 
+int migrate_fd = 0;
+
+static pid_t get_qemu_pid(void) {
+    char line[1000];
+    FILE *cmd = popen("pgrep qemu", "r");
+
+    char *tmp = fgets(line, 1000, cmd);
+    assert(tmp > 0);
+    pid_t pid = strtoul(line, NULL, 10);
+
+    pclose(cmd);
+
+    return pid;
+}
+
 int qemu_memfd_create(const char *name, size_t size, bool hugetlb,
                       uint64_t hugetlbsize, unsigned int seals, Error **errp)
 {
+    printf("qemu_memfd_create size %lu\n", size);
+
+    pid_t qemu_pid = get_qemu_pid();
+    if (qemu_pid != getpid()) {
+        printf("found exisiting other qemu instance with pid %i\n", qemu_pid);
+
+        char line[1000];
+        snprintf(line, 1000, "/proc/%i/fd/17", qemu_pid);
+
+        int fd = open(line, O_RDWR);
+        assert(fd > 0);
+        return fd;
+    }
+
+    printf("did not find other qemu. creating new memfd\n");
+
     int htsize = hugetlbsize ? ctz64(hugetlbsize) : 0;
 
     if (htsize && 1ULL << htsize != hugetlbsize) {
@@ -86,6 +118,9 @@ int qemu_memfd_create(const char *name, size_t size, bool hugetlb,
         goto err;
     }
 
+    migrate_fd = mfd;
+    printf("created memfd (handle %i)\n", mfd);
+
     return mfd;
 
 err:
@@ -106,8 +141,11 @@ err:
  */
 void *qemu_memfd_alloc(const char *name, size_t size, unsigned int seals,
                        int *fd, Error **errp)
-{
+{   
     void *ptr;
+
+    printf("qemu_memfd_alloc size %lu\n", size);
+
     int mfd = qemu_memfd_create(name, size, false, 0, seals, NULL);
 
     /* some systems have memfd without sealing */
@@ -171,6 +209,8 @@ enum {
  */
 bool qemu_memfd_alloc_check(void)
 {
+    printf("qemu_memfd_alloc_check\n");
+
     static int memfd_check = MEMFD_TODO;
 
     if (memfd_check == MEMFD_TODO) {
@@ -193,6 +233,8 @@ bool qemu_memfd_alloc_check(void)
  */
 bool qemu_memfd_check(unsigned int flags)
 {
+    printf("qemu_memfd_check\n");
+
 #ifdef CONFIG_LINUX
     int mfd = memfd_create("test", flags | MFD_CLOEXEC);
 

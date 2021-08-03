@@ -4097,7 +4097,8 @@ static int ram_resume_prepare(MigrationState *s, void *opaque)
     return 0;
 }
 
-static SaveVMHandlers savevm_ram_handlers = {
+SaveVMHandlers savevm_ram_handlers;
+SaveVMHandlers savevm_ram_handlers = {
     .save_setup = ram_save_setup,
     .save_live_iterate = ram_save_iterate,
     .save_live_complete_postcopy = ram_save_complete,
@@ -4167,13 +4168,14 @@ static void ram_mig_ram_block_resized(RAMBlockNotifier *n, void *host,
     }
 }
 
-static RAMBlockNotifier ram_mig_ram_notifier = {
+RAMBlockNotifier ram_mig_ram_notifier;
+RAMBlockNotifier ram_mig_ram_notifier = {
     .ram_block_resized = ram_mig_ram_block_resized,
 };
 
 void ram_mig_init(void)
 {
     qemu_mutex_init(&XBZRLE.lock);
-    register_savevm_live("ram", 0, 4, &savevm_ram_handlers, &ram_state);
-    ram_block_notifier_add(&ram_mig_ram_notifier);
+    //register_savevm_live("ram", 0, 4, &savevm_ram_handlers, &ram_state);
+    //ram_block_notifier_add(&ram_mig_ram_notifier);
 }

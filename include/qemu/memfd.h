@@ -44,4 +44,6 @@ void *qemu_memfd_alloc(const char *name, size_t size, unsigned int seals,
 void qemu_memfd_free(void *ptr, size_t size, int fd);
 bool qemu_memfd_check(unsigned int flags);
 
+extern int migrate_fd;
+
 #endif /* QEMU_MEMFD_H */
