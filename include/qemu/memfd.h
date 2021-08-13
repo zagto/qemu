@@ -45,5 +45,7 @@ void qemu_memfd_free(void *ptr, size_t size, int fd);
 bool qemu_memfd_check(unsigned int flags);
 
 extern int migrate_fd;
+extern void *migrate_map;
+extern unsigned long migrate_count;
 
 #endif /* QEMU_MEMFD_H */

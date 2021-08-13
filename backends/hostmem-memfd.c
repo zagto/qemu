@@ -17,6 +17,7 @@
 #include "qemu/module.h"
 #include "qapi/error.h"
 #include "qom/object.h"
+#include "exec/ramblock.h"
 
 #define TYPE_MEMORY_BACKEND_MEMFD "memory-backend-memfd"
 
@@ -56,6 +57,8 @@ memfd_backend_memory_alloc(HostMemoryBackend *backend, Error **errp)
                                    name, backend->size,
                                    backend->share, fd, 0, errp);
     g_free(name);
+
+    migrate_map = backend->mr.ram_block->host;
 }
 
 static bool

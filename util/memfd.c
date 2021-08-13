@@ -49,7 +49,7 @@ int memfd_create(const char *name, unsigned int flags)
 
 int migrate_fd = 0;
 
-static pid_t get_qemu_pid(void) {
+/*static pid_t get_qemu_pid(void) {
     char line[1000];
     FILE *cmd = popen("pgrep qemu", "r");
 
@@ -60,14 +60,17 @@ static pid_t get_qemu_pid(void) {
     pclose(cmd);
 
     return pid;
-}
+}*/
+
+
+size_t migrate_count;
 
 int qemu_memfd_create(const char *name, size_t size, bool hugetlb,
                       uint64_t hugetlbsize, unsigned int seals, Error **errp)
 {
     printf("qemu_memfd_create size %lu\n", size);
 
-    pid_t qemu_pid = get_qemu_pid();
+    /*pid_t qemu_pid = get_qemu_pid();
     if (qemu_pid != getpid()) {
         printf("found exisiting other qemu instance with pid %i\n", qemu_pid);
 
@@ -79,7 +82,7 @@ int qemu_memfd_create(const char *name, size_t size, bool hugetlb,
         return fd;
     }
 
-    printf("did not find other qemu. creating new memfd\n");
+    printf("did not find other qemu. creating new memfd\n");*/
 
     int htsize = hugetlbsize ? ctz64(hugetlbsize) : 0;
 
@@ -120,6 +123,9 @@ int qemu_memfd_create(const char *name, size_t size, bool hugetlb,
 
     migrate_fd = mfd;
     printf("created memfd (handle %i)\n", mfd);
+
+    assert(size % 0x1000 == 0);
+    migrate_count = size / 0x1000;
 
     return mfd;
 

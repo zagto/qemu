@@ -55,6 +55,9 @@
 #include "qemu/iov.h"
 #include "multifd.h"
 #include "sysemu/runstate.h"
+#include "qemu/memfd.h"
+#include <sys/syscall.h>
+#include <unistd.h>
 
 #if defined(__linux__)
 #include "qemu/userfaultfd.h"
@@ -4097,6 +4100,63 @@ static int ram_resume_prepare(MigrationState *s, void *opaque)
     return 0;
 }
 
+static void ram_disaggregated_save_state(QEMUFile *f, void *opaque) {
+    uint8_t *physical_addresses = malloc(migrate_count * sizeof(size_t));
+
+    munmap(migrate_map, migrate_count * 0x1000);
+
+    int result = syscall(447, migrate_fd, physical_addresses);
+    if (result != 0) {
+        printf("migrate_extract failed\n");
+        exit(0);
+    }
+
+    qemu_put_buffer(f, physical_addresses, migrate_count * sizeof(size_t));
+
+    free(physical_addresses);
+}
+
+void *migrate_map;
+
+static int ram_disaggregated_load_state(QEMUFile *f, void *opaque, int version_id) {
+    uint8_t *physical_addresses = malloc(migrate_count * sizeof(size_t));
+
+    munmap(migrate_map, migrate_count * 0x1000);
+
+    int result = syscall(447, migrate_fd, physical_addresses);
+    if (result != 0) {
+        printf("migrate_extract failed\n");
+        exit(0);
+    }
+
+    result = qemu_get_buffer(f, physical_addresses, migrate_count * sizeof(size_t));
+    if (result != 0) {
+        printf("ram_disaggregated_load_state: qemu_get_buffer failed\n");
+        return result;
+    }
+
+    result = syscall(448, migrate_fd, migrate_count, physical_addresses);
+    if (result != 0) {
+        printf("migrate_insert failed\n");
+        exit(0);
+    }
+
+    free(physical_addresses);
+
+    uint8_t *address = mmap(migrate_map, 0x2000, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_FIXED, migrate_fd, 0);
+    if (address != migrate_map) {
+        printf("mmap memfd into destination failed\n");
+        exit(0);
+    }
+
+    return result;
+}
+
+static SaveVMHandlers savevm_ram_disaggregated_handlers = {
+    .save_state = ram_disaggregated_save_state,
+    .load_state = ram_disaggregated_load_state,
+};
+
 SaveVMHandlers savevm_ram_handlers;
 SaveVMHandlers savevm_ram_handlers = {
     .save_setup = ram_save_setup,
@@ -4176,6 +4236,6 @@ RAMBlockNotifier ram_mig_ram_notifier = {
 void ram_mig_init(void)
 {
     qemu_mutex_init(&XBZRLE.lock);
-    //register_savevm_live("ram", 0, 4, &savevm_ram_handlers, &ram_state);
+    register_savevm_live("ram", 0, 4, &savevm_ram_disaggregated_handlers, &ram_state);
     //ram_block_notifier_add(&ram_mig_ram_notifier);
 }
