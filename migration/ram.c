@@ -4174,6 +4174,8 @@ static RAMBlockNotifier ram_mig_ram_notifier = {
 void ram_mig_init(void)
 {
     qemu_mutex_init(&XBZRLE.lock);
-    register_savevm_live("ram", 0, 4, &savevm_ram_handlers, &ram_state);
-    ram_block_notifier_add(&ram_mig_ram_notifier);
+    assert(&savevm_ram_handlers != NULL);
+    assert(&ram_mig_ram_notifier != NULL);
+    //register_savevm_live("ram", 0, 4, &savevm_ram_handlers, &ram_state);
+    //ram_block_notifier_add(&ram_mig_ram_notifier);
 }
